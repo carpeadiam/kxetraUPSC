@@ -4,8 +4,8 @@ from youtube_transcript_api import YouTubeTranscriptApi
 import google.generativeai as genai
 
 
-genai.configure(api_key='AIzaSyDlpNp8jEAPmkim1qu4rrTF8naP1VbwcYg')
-model = genai.GenerativeModel("gemini-1.5-flash")
+genai.configure(api_key='AIzaSyAu9_a6aXZ0zCk7lRJoc6USdW8xLc_b0J4')
+model = genai.GenerativeModel("gemini-2.0-flash-exp")
 
 
 

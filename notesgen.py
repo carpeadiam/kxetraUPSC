@@ -4,7 +4,7 @@ import google.generativeai as genai
 def generate_mcqs_from_text(text_content):
     # Replace with your Gemini API endpoint and API key
 
-    genai.configure(api_key='secret_hehe')
+    genai.configure(api_key='AIzaSyDlpNp8jEAPmkim1qu4rrTF8naP1VbwcYg')
     model = genai.GenerativeModel("gemini-1.5-flash")
 
     prompt = f"""

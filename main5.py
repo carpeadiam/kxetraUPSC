@@ -1,12 +1,15 @@
 import json
-from flask import Flask, request, redirect, make_response, jsonify, session,render_template
+from flask import Flask, request, redirect, make_response, jsonify, session, render_template, url_for
 import secrets
 import httpx
 from oauthlib.oauth2 import WebApplicationClient
 from notion_client import Client as NotionClient
+from mailing import *
+import mysql.connector
 import logging
 import os
 import datetime
+import random
 from newsfeed import buildnewsfeed
 from videofeed import buildvideofeed, buildvideosummary
 from notesgen import generate_mcqs_from_text
@@ -25,24 +28,35 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 logging.basicConfig(level=logging.DEBUG)
 
 # Notion OAuth credentials
-client_id = "client_id_hehe"
-client_secret = "client_secret_hehe"
+client_id = "5e9dc8cb-8ed0-4885-a451-b2edca1aa699"
+client_secret = "secret_W0MN3GaPty9zWpJV5p7T6zfjwqi62rO9fC5xUZU8bgw"
 redirect_uri = "http://localhost:3000/redirect"  # Use 'localhost' as per Notion's requirement
 
 dailyNotes = []
 dailyNotesv = []
 book_files = ['book1.json']
+quiz_files=['quiz.json']
 username="Adi A"
 profilepic=""
 
 books = []
 json_data=[]
+quizzes=[]
 
 for book_file in book_files:
     with open(book_file, 'r') as f:
         book = json.load(f)
         books.append(book)
 
+for quiz_file in quiz_files:
+    with open(quiz_file, 'r') as f:
+        quiz = json.load(f)
+        quizzes.append(quiz)
+
+
+
+
+#################################### LOGIN SYSTEMS ############################################################
 class NotionAppClient(WebApplicationClient):
     def __init__(self, client_id, client_secret, **kwargs):
         super().__init__(client_id, **kwargs)
@@ -76,14 +90,360 @@ class NotionAppClient(WebApplicationClient):
 # Initialize Notion OAuth client
 notion_oauth_client = NotionAppClient(client_id=client_id, client_secret=client_secret)
 
+def check_new_user_sql(email):
+    host="localhost"
+    user = "root"
+    password = "root"
+    database = "kxetra_db1"
+
+    connection = mysql.connector.connect(
+        host=host,
+        user=user,
+        password=password,
+        database=database
+    )
+
+    cursor = connection.cursor()
+    cursor.execute("SELECT * FROM users WHERE email_id LIKE %s",(email))
+
+    acc = cursor.fetchone()
+    cursor.close()
+    connection.close()
+
+    if acc:
+        return "Account Exists Login"
+    else:
+        return "Create Account"
+
+def login_sql(email,passw):
+    host="localhost"
+    user = "root"
+    password = "root"
+    database = "kxetra_db1"
+
+    connection = mysql.connector.connect(
+        host=host,
+        user=user,
+        password=password,
+        database=database
+    )
+
+    cursor = connection.cursor()
+    cursor.execute("SELECT * FROM users WHERE email_id LIKE %s and password LIKE %s",(email,passw))
+
+    acc = cursor.fetchone()
+    cursor.close()
+    connection.close()
+
+    if acc:
+        session['email'] = email
+        session['id_logged']=acc[0]
+        session['name'] = acc[3]
+        session['profile_picture_url'] = acc[4]
+        session['auth_token_user']=acc[5]
+        session['score']=acc[6]
+        session['parent_page_notes_token']=acc[7]
+        return "logged in"
+
+    else:
+        return "incorrect credentials"
+
+
+
+
+
+
+
+def create_new_user(email,passw):
+    host="localhost"
+    user = "root"
+    password = "root"
+    database = "kxetra_db1"
+
+
+    connection = mysql.connector.connect(
+        host=host,
+        user=user,
+        password=password,
+        database=database
+    )
+
+    cursor = connection.cursor()
+    cursor.execute("INSERT INTO users(email_id,password) values(%s,%s)",(email,passw))
+    connection.commit()
+    cursor.close()
+    connection.close()
+
+
+def create_verification_code():
+    return random.randint(1000,9999)
+
+
+
+
+###########################################################################################
+
+
+
+
+
 articles=buildnewsfeed()
 videos=buildvideofeed("https://www.youtube.com/feeds/videos.xml?channel_id=UC7Q0EfPzTwtanMVSWuK_QXA")
 
 
 @app.route("/")
 def land():
+    session['register_message'] = ""
+    session['verification_code'] = None
+    session['email_temp'] = ""
+    session['password_temp'] = ""
+    session['verify_message'] = ""
+    session['message_after_new_account'] = ""
+    session['login_message'] = ""
+
+    session['username_logged'] = ""
+    session['id_logged'] = ""
+    session['fp_email'] = ""
+    session['fp_user_id'] = ""
     return render_template("land.html")
 
+
+@app.route("/register")
+def register():
+    return render_template("register.html",message=session['register_message'])
+
+
+@app.route("/process_register", methods=['POST'])
+def new_user():
+      email_input = request.form['email id']
+      password_input=request.form['password']
+      confirm_password_input = request.form['confirm_password']
+      email_input_tuple=(email_input,)
+
+      register_control = check_new_user_sql(email_input_tuple)
+
+      if register_control == "Account Exists Login":
+          session['register_message']="Email id already an account, login"
+          return render_template("register.html", message=session['register_message'])
+      elif register_control == "Create Account":
+          if password_input == confirm_password_input:
+              session['verification_code']=None
+              session['email_temp'] = email_input
+              session['password_temp'] = password_input
+              code1=create_verification_code()
+              session['verification_code'] = code1
+              send_verification(email_input,code1)
+              return render_template("verify_new.html",message=session['verify_message'])
+          else:
+              session['register_message'] = "Passwords don't match, try again"
+              return render_template("register.html", message=session['register_message'])
+      else:
+          print("404")
+
+@app.route("/verify_new",methods=['POST'])
+def verify_new():
+    code_input = request.form['code']
+
+    if int(code_input)== int(session['verification_code']):
+        create_new_user(session['email_temp'],session['password_temp'])
+        session['message_after_new_account']="Account successfully created. Login in to your account"
+        return redirect("register_notion")
+    else:
+        session['verify_message'] = "Incorrect code. Check again"
+        return render_template("verify_new.html",message=session['verify_message'])
+
+
+@app.route("/register_notion")
+def register_notion():
+    state = secrets.token_urlsafe(16)
+
+    # Store the state in the session
+    session['oauth_state'] = state
+    logging.debug(f"Setting session oauth_state: {state}")
+
+    # Create the login URL
+    login_url = notion_oauth_client.login_link(redirect_uri, state)
+
+    logging.debug(f"Redirecting to login URL: {login_url}")
+
+    return redirect(login_url)
+
+
+
+@app.route("/login")
+def login():
+    if not session['login_message'] :
+        session['login_message'] = ""
+    return render_template("login.html", message=session['login_message'])
+
+@app.route("/process_login", methods=['POST'])
+def process_login():
+    email_input = request.form['email_login']
+    session['email_temp'] = email_input
+    password_input = request.form['password_login']
+    #email_input_tuple = (email_input,password_input)
+    login_control = login_sql(email_input,password_input)
+
+    if login_control == "logged in":
+
+        host="localhost"
+        user = "root"
+        password = "root"
+        database = "kxetra_db1"
+
+        connection = mysql.connector.connect(
+            host=host,
+            user=user,
+            password=password,
+            database=database
+        )
+
+        cursor = connection.cursor()
+
+
+        query = """
+            SELECT *
+            FROM users
+            WHERE email_id = %s
+              AND auth_token IS NOT NULL
+              AND parent_page_notes_token IS NOT NULL;
+            """
+
+        cursor.execute(query, (email_input,))
+        result = cursor.fetchone()
+
+        cursor.close()
+        connection.close()
+
+        if result:
+            host = "localhost"
+            user = "root"
+            password = "root"
+            database = "kxetra_db1"
+
+            connection = mysql.connector.connect(
+                host=host,
+                user=user,
+                password=password,
+                database=database
+            )
+            cursor = connection.cursor()
+
+            # SQL query to fetch auth_token and parent_page_notes_token for a specific email_id
+            query = """
+                SELECT auth_token, parent_page_notes_token
+                FROM users
+                WHERE email_id = %s
+                """
+            # Execute the query with the given email
+            cursor.execute(query, (email_input,))
+
+            # Fetch the result (if exists)
+            result = cursor.fetchone()
+
+            cursor.close()
+            connection.close()
+            session['auth_token'],session['parent_page_notes_token']=result
+            return redirect("home")
+        else:
+            return redirect("register_notion")
+
+
+
+    elif login_control == "incorrect credentials":
+        session['login_message'] = "Incorrect credentials. Try again"
+        return render_template("login.html", message=session['login_message'])
+    else:
+        return "404"
+
+@app.route("/forgot_password")
+def forgot_password():
+    return render_template("change_password.html")
+
+@app.route("/process_forgot_password",methods=["POST"])
+def process_forgot_password():
+    fp_email = request.form['fp_email']
+    host="localhost"
+    user = "root"
+    password = "root"
+    database = "kxetra_db1"
+
+    connection = mysql.connector.connect(
+        host=host,
+        user=user,
+        password=password,
+        database=database
+    )
+
+    cursor = connection.cursor()
+    cursor.execute("SELECT * FROM users WHERE email_id LIKE %s", (fp_email,))
+
+    acc = cursor.fetchone()
+    cursor.close()
+    connection.close()
+
+    if acc:
+
+        code1 = create_verification_code()
+        session['verification_code'] = code1
+        session['fp_email'] = fp_email
+        session['fp_user_id'] = int(acc[0])
+        send_forgot_password(fp_email, code1)
+        return render_template("change_password_2.html")
+
+    else:
+        return render_template("change_password.html",message="Email not registered, don't scam")
+
+
+
+@app.route("/process_forgot_password2",methods=["POST"])
+def process_forgot_password2():
+    fp_code= request.form['fp_code']
+    fp_new_password = request.form['fp_new_password']
+    fp_confirm = request.form['fp_new_confirm']
+    print(fp_code)
+    print(session['verification_code'])
+    print(session['fp_email'])
+    print(session['fp_user_id'])
+    print(type(session['fp_user_id']))
+    if int(fp_code) == int(session['verification_code']) and fp_new_password == fp_confirm:
+        print("1")
+        host="localhost"
+        user = "root"
+        password = "root"
+        database = "kxetra_db1"
+
+        connection = mysql.connector.connect(
+            host=host,
+            user=user,
+            password=password,
+            database=database
+        )
+
+        cursor = connection.cursor()
+
+        print(session['fp_user_id'])
+
+        cursor.execute("UPDATE users SET password = %s WHERE id = %s", (fp_new_password,session['fp_user_id']))
+
+        cursor.close()
+        connection.commit()
+        connection.close()
+        return "success"
+
+    elif fp_new_password != fp_confirm:
+        print("2")
+        return render_template("change_password_2.html",message="Passwords don't match")
+    elif int(fp_code) != int(session['verification_code']):
+        print("3")
+        return render_template("change_password_2.html", message="Wrong verification code")
+    else:
+        return render_template("home.html")
+
+
+
+
+"""
 @app.route('/login')
 def login():
     # Generate a secure state token
@@ -99,6 +459,9 @@ def login():
     logging.debug(f"Redirecting to login URL: {login_url}")
 
     return redirect(login_url)
+
+
+"""
 
 @app.route('/redirect')
 def oauth_redirect():
@@ -130,8 +493,38 @@ def oauth_redirect():
         token = notion_oauth_client.fetch_token(code)
         print(token)
         global username, profilepic
+
         username=token['owner']['user']['name']
         profilepic=token['owner']['user']['avatar_url']
+        auth_token=token['access_token']
+        template_page_id=token['duplicated_template_id']
+
+        host="localhost"
+        user = "root"
+        password = "root"
+        database = "kxetra_db1"
+
+        connection = mysql.connector.connect(
+            host=host,
+            user=user,
+            password=password,
+            database=database
+        )
+
+        cursor = connection.cursor()
+
+        query = """
+        UPDATE users
+        SET auth_token = %s, parent_page_notes_token = %s , name = %s , profile_picture_url = %s
+        WHERE email_id = %s
+        """
+        cursor.execute(query, (auth_token, template_page_id, username,profilepic,session['email_temp']))
+
+        cursor.close()
+        connection.commit()
+        connection.close()
+
+
         session['oauth_token'] = token  # Store token in session
         logging.debug(f"Stored oauth_token in session: {token}")
 
@@ -143,6 +536,10 @@ def oauth_redirect():
 
 @app.route("/home")
 def home():
+
+
+
+
     return render_template('home3.html', articles=articles, videos=videos,books=books,username=username,profilepic=profilepic, enumerate=enumerate)
 
 @app.route("/newsfeed")
@@ -161,6 +558,10 @@ def library():
 def tests():
     return render_template('tests.html',books=books ,enumerate=enumerate)
 
+@app.route("/interview")
+def interview():
+    return render_template("interview.html")
+
 
 
 @app.route('/logout')
@@ -170,11 +571,13 @@ def logout():
     logging.debug("Logged out and cleared session.")
     return resp
 
+"""
 @app.route('/session')
 def display_session():
     # For debugging purposes only. Remove or secure in production.
     return jsonify(dict(session))
 
+"""
 
 @app.route('/updatenotes', methods=['POST'])
 def update_notes():
@@ -197,14 +600,14 @@ def update_notesv():
 def create_page():
     print("ping")
     global dailyNotes, dailyNotesv
-    token_data = session.get('oauth_token')
+    token_data = session['auth_token']
     print(token_data)
 
     if not token_data:
         return jsonify({"status": "error", "message": "Not logged in"}), 303
 
     # Use async version of Notion client
-    notion = NotionClient(auth=token_data['access_token'])
+    notion = NotionClient(auth=token_data)
 
     datetoday = datetime.datetime.now()
     titleDate = datetoday.strftime("%A") + ", " + datetoday.strftime("%d") + " " + datetoday.strftime(
@@ -217,8 +620,9 @@ def create_page():
             if page["properties"]["title"]["title"][0]["plain_text"] == titleDate:
                 page_id1 = page["id"]
                 choiceControl = 1
-            elif page["properties"]["title"]["title"][0]["plain_text"] == "Super Notes":
-                page_id1 = page["id"]
+        if choiceControl == 0:
+            page_id1=session['parent_page_notes_token']
+
         print(page_id1)
 
     except Exception as e:
@@ -309,7 +713,10 @@ def book_page(book_name):
 @app.route('/books/<book_name>/<int:chapter_id>')
 def chapter_page(book_name, chapter_id):
     # Find the book in the list by book_name
+    global json_data
     book = next((b for b in books if b['book_name'] == book_name), None)
+
+    quiz=next((b for b in quizzes if b['book_name'] == book_name), None)
 
     if not book:
         return "Book not found", 404
@@ -317,9 +724,18 @@ def chapter_page(book_name, chapter_id):
     # Check if the chapter_id is within the range of available chapters
     if chapter_id < 0 or chapter_id >= len(book['chapters']):
         return "Chapter not found", 404
+    if chapter_id >= 0 and  chapter_id < len(quiz['chapters']):
+        json_data=quiz['chapters'][chapter_id]['mcqs']
+
 
     chapter = book['chapters'][chapter_id]  # Access chapter by index
     return render_template('chapter_page.html', book_name=book_name, chapter=chapter,enumerate=enumerate)
+
+
+@app.route("/chapterquiz")
+def chapterquiz():
+    return render_template('quiz.html', total_questions=len(json_data))
+
 
 def get_notion_page_text_by_title(notion,parent_page_id, title):
 
@@ -338,14 +754,14 @@ def get_notion_page_text_by_title(notion,parent_page_id, title):
 
 @app.route("/dailytest")
 def dailyTest():
-    token_data = session.get('oauth_token')
+    token_data = session['auth_token']
     global json_data
 
-    if not token_data or 'access_token' not in token_data:
+    if not token_data :
         return jsonify({"error": "OAuth token not found"}), 401
 
     try:
-        notion = NotionClient(auth=token_data['access_token'])
+        notion = NotionClient(auth=token_data)
     except Exception as e:
         return jsonify({"error": f"Notion Client initialization failed: {str(e)}"}), 500
 
@@ -449,7 +865,8 @@ def dailyTest():
         mcq_json = generate_mcqs_from_text(text_content)
         json_data = json.loads(mcq_json)
         print(json_data)
-        print(json_data)
+        print(jsonify(json_data))
+        print(len(json_data))
         return render_template('quiz.html', total_questions=len(json_data))
 
         # Return the generated MCQs
@@ -460,14 +877,14 @@ def dailyTest():
 
 @app.route("/weeklytest")
 def weeklyTest():
-    token_data = session.get('oauth_token')
+    token_data = session['auth_token']
     global json_data
 
-    if not token_data or 'access_token' not in token_data:
+    if not token_data :
         return jsonify({"error": "OAuth token not found"}), 401
 
     try:
-        notion = NotionClient(auth=token_data['access_token'])
+        notion = NotionClient(auth=token_data)
     except Exception as e:
         return jsonify({"error": f"Notion Client initialization failed: {str(e)}"}), 500
 
@@ -608,6 +1025,8 @@ def weeklyTest():
 def get_question(question_id):
     global json_data
     if 0 <= question_id < len(json_data):
+        print(json_data[question_id])
+        print(question_id)
         return jsonify(json_data[question_id])
     else:
         return jsonify({"error": "Invalid question ID"})
