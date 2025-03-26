@@ -13,6 +13,7 @@ import random
 from newsfeed import buildnewsfeed
 from videofeed import buildvideofeed, buildvideosummary
 from notesgen import generate_mcqs_from_text
+from flask import send_file, redirect, jsonify
 
 app = Flask(__name__)
 
@@ -562,6 +563,17 @@ def tests():
 def interview():
     return render_template("interview.html")
 
+@app.route("/generate_mock_paper")
+def generate_mock_paper():
+    # Call the function that generates the mock paper PDF
+    pdf_path = "paper_generator_files/question_paper/paper1.pdf"  # Ensure this is the correct path
+
+    # Ensure the file exists before sending
+    if not os.path.exists(pdf_path):
+        return "Mock Paper generation failed!", 500
+
+    # Send file as a downloadable attachment
+    return send_file(pdf_path, as_attachment=True, download_name="Mock_Paper.pdf")
 
 
 @app.route('/logout')

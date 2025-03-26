@@ -60,7 +60,7 @@
             margin-right: 10px;
             width: 40px;
             height: 40px;
-
+            /*border-radius: 50%;*/
         }
 
         .sidebar button {
@@ -87,7 +87,7 @@
         .sidebar button img {
             width: 20px;
             height: 20px;
-
+            /*object-fit: cover;*/
         }
 
         .sidebar button:hover {
@@ -200,8 +200,9 @@
             align-items: flex-start;
             justify-content: flex-start;
             gap: 20px;
-            margin-top: 50px;
+            margin-top: 20px;
             margin-left: 30px;
+            margin-bottom: 30px;
         }
 
         .test-button {
@@ -277,13 +278,32 @@
             padding: 10px 20px;
             font-weight : bold;
         }
+        .mock-section {
+            text-align: center;
+            /*transform: translate(-200%,0%);*/
+        }
+        .generate-btn {
+            background-color: #d9d9d9;
+            border: none;
+            padding: 15px 60px;
+            border-radius: 10px;
+            font-size: 18px;
+            color: #333;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            width: 400px; /* Set same width for both buttons */
+            text-align:center;
+        }
+        .generate-btn:hover {
+            background: #c9302c;
+        }
     </style>
 </head>
 <body>
 
     <!-- Sidebar -->
     <div class="sidebar">
-        <span class="heading"><img src="static/logo.png" alt="Logo"> kxetra</span>
+        <span class="heading"><img src="static/logo2.png" alt="Logo"> kxetra</span>
         <span class="heading2">upsc</span>
 
         <div class="nav-buttons">
@@ -319,7 +339,7 @@
         <!-- Profile and Logout -->
         <div class="profile">
             <!--<img src="profile-placeholder.png" alt="Profile Picture">--> <!-- Placeholder for profile picture -->
-            <img src="static\Profile Picture.png" alt="Profile Picture"><h3>Adithya Acharya</h3>
+            <img src="static\Profile Picture.png" alt="Profile Picture"><h3>Maietry Prajapati</h3>
             <a href="/logout">Logout</a>
         </div>
         </div>
@@ -340,6 +360,15 @@
         <div class="buttons-container">
             <button class="test-button" onclick="window.location.href='/dailytest'">Generate Daily Test</button>
             <button class="test-button" onclick="window.location.href='/weeklytest'">Generate Weekly Test</button>
+        </div>
+        </br>
+        <div class="mock-section">
+            <div class="header">Mock Papers</div>
+            <div class ="buttons-container">
+                <a href="/generate_mock_paper" target="_blank">
+                    <button class="generate-btn">Generate Mock Paper</button>
+                </a>
+            </div>        
         </div>
     </div>
 </body>

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Aspire - UPSC Study Platform</title>
+    <link href="https://fonts.googleapis.com/css2?family=ABeeZee&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/htmx.org@1.6.1/dist/htmx.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: 'Manrope', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #fbfafa;
+            display: flex;
+            flex-direction: row;
+            min-height: 100vh;
+            overflow-y: auto; /* Allows vertical scrolling */
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 250px;
+            background-color: #ffffff;
+            height: 100vh;
+            padding-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1000;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .heading {
+            font-family: 'ABeeZee', sans-serif;
+            display: flex;
+            align-items: center;
+            font-size: 46px;
+            margin-bottom: 20px;
+            color: #C72A0B;
+            transform: translate(-5%,20%);
+        }
+
+        .heading2 {
+            font-family: 'ABeeZee', sans-serif;
+            display: flex;
+            align-items: center;
+            font-size: 30px;
+            margin-bottom: 20px;
+            color: #333;
+            transform: translate(75%,-70%);
+        }
+
+        .sidebar img {
+            margin-right: 10px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+        }
+
+        .sidebar button {
+            width: 120%;
+            padding: 10px;
+            margin: 5px;
+            font-size: 16px;
+            background-color: transparent; /* Transparent background */
+            color: #aeaeae;
+            border: none;
+            border-radius: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: left;
+            transition: background-color 0.3s ease;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-start;
+            transform: translate(-15%, -250%);
+            font-family: 'Manrope', sans-serif;
+        }
+
+        .sidebar button img {
+            width: 20px;
+            height: 20px;
+            object-fit: cover;
+        }
+
+        .sidebar button:hover {
+            background-color: rgb(168, 168, 168);
+            color: #000000;
+        }
+
+        .sidebar button.selected {
+            background-color: #FCFBF9;
+            color: #000000;
+            border: 2px solid #E0E0E0;
+            transform: translate(-15%,-235%);
+        }
+
+        .sidebar .nav-buttons {
+            margin-top: auto;
+            margin-bottom: 20px;
+        }
+
+        .sidebar #create-notes-btn {
+            text-align: center;
+            width: 80%;
+            padding: 10px;
+            font-size: 16px;
+            background-color: darkgrey;
+            color: #000000;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            transform: translate(0%,-100%);
+        }
+
+        .sidebar #create-notes-btn:hover {
+            background-color: grey;
+        }
+
+        /* Profile and Logout */
+        .profile {
+            display: flex;
+            flex-direction: row; /* Change to row for side-by-side layout */
+            align-items: center;
+            background-color: #FFFFFF; /* White background */
+            padding: 10px 15px; /* Adjust padding for a compact look */
+            box-shadow: 0px 1px 5px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+            border-radius: 15px; /* Rounded edges for a capsule look */
+            margin-bottom: 20px; /* Remove extra margins */
+            border: 2px solid #E0E0E0;
+        }
+
+        .profile img {
+            width: 30px; /* Adjust image size */
+            height: 30px;
+            border-radius: 50%; /* Keep the circular profile picture */
+            margin-right: 10px; /* Space between image and text */
+        }
+
+        .profile h3 {
+            color: #000; /* Black text for name */
+            font-size: 16px; /* Slightly smaller font */
+            margin: 0; /* No margin around text */
+            font-weight: bold;
+            transform: translate(0%,-25%);
+        }
+
+        .profile a {
+            color: #000; /* Black text for the logout link */
+            text-decoration: none;
+            font-size: 14px;
+            margin-left: 5px; /* Space between name and logout link */
+            display: flex;
+            align-items: center;
+            transform: translate(-238%,45%);
+        }
+
+        .profile a::after {
+            content: '>'; /* Add a ">" arrow after Logout text */
+            font-size: 14px;
+            margin-left: 3px;
+        }
+
+        .profile a:hover {
+            text-decoration: underline; /* Underline text on hover */
+        }
+
+        /* Main Content */
+        .main-content {
+            flex-grow: 1;
+            padding: 20px;
+            margin-left: 250px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-sizing: border-box;
+            overflow-x: hidden;
+        }
+
+        .header {
+            padding: 10px;
+            margin-bottom: 0px; 
+            font-size: 32px;
+            width: 100%;
+            text-align: left;
+            font-weight: bold;
+            color: #000000;
+            transform: translate(3.5%,0%);
+        }
+        /* Status Bar */
+        #status-bar {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #4caf50;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+            z-index: 100;
+        }
+
+        /* Main Banner */
+        .main-banner {
+            width: 93%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #FFFFFF;
+            padding: 20px;
+            margin-bottom: 20px;
+            margin-right:30px;
+            border-radius: 15px;
+            transform: translate(2%,0%);
+            border: 2px solid #E0E0E0;
+        }
+
+        .main-banner .text {
+            max-width: 60%;
+            transform: translate(0%,-10%);
+        }
+
+        .main-banner .text h1 {
+            font-size: 35px;
+            font-weight: bold;
+            color: #000000;
+            margin: 0;
+        }
+
+        .main-banner .text p {
+            font-size: 22px;
+            color: #505050;
+            margin: 10px 0 0 0;
+        }
+
+        .main-banner .image {
+            max-width: 35%;
+        }
+
+        .main-banner .image img {
+            margin-right: 100px;
+        }
+        .red {color:red;}
+        .header-main {
+            width: 95%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-text-box {
+            background-color: #FFFFFF;
+            border-radius: 15px;
+            border: 2px solid #E0E0E0;
+            padding: 10px 20px;
+            font-weight : bold;
+        }
+        .mock-section {
+            text-align: center;
+            transform: translate(-200%,0%);
+        }
+        .generate-btn {
+            background: #d9534f;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 30px;
+            margin-left: 0px;
+        }
+        .generate-btn:hover {
+            background: #c9302c;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <span class="heading"><img src="pictures/logo.png" alt="Logo"> kxetra</span>
+        <span class="heading2">upsc</span>
+
+        <div class="nav-buttons">
+            <button onclick="window.location.href='/featureguide'">
+                <img src="" alt="Feature Icon"> Feature Guide
+            </button>
+            <button class="selected" onclick="window.location.href='/home'">
+                <img src="pictures/home-icon.png" alt="Home Icon"> Home
+            </button>
+            <button onclick="window.location.href='/newsfeed'">
+                <img src="pictures/news-icon.png" alt="News Icon"> Newsfeed
+            </button>
+            <button onclick="window.location.href='/videofeed'">
+                <img src="pictures/video-icon.png" alt="Video Icon"> Videofeed
+            </button>
+            <button onclick="window.location.href='/library'">
+                <img src="pictures/library-icon.png" alt="Library Icon"> Library
+            </button>
+            <button onclick="window.location.href='/tests'">
+                <img src="pictures/tests-icon.png" alt="Tests Icon"> Tests
+            </button>
+            <button onclick="window.location.href='/interview'">
+                <img src="" alt="Interview Icon"> Interview
+            </button>
+            <button onclick="window.location.href='/calendar'">
+                <img src="" alt="Calendar Icon"> Calendar
+            </button>
+        </div>
+        <button id="create-notes-btn">Create Notion Notes</button>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="header-main">
+            <div class="header-text-box">Get Kxetra Pro and unlock Premium features to supercharge your prep!</div>
+        <!-- Profile and Logout -->
+        <div class="profile">
+            <!--<img src="profile-placeholder.png" alt="Profile Picture">--> <!-- Placeholder for profile picture -->
+            <img src="pictures\Profile Picture.png" alt="Profile Picture"><h3>Maietry Prajapati</h3>
+            <a href="/logout">Logout</a>
+        </div>
+        </div>
+
+        <div class="main-banner">
+            <div class="text">
+                <h1>Start <span class = "red">Today</span>, Achieve Tomorrow</h1>
+                <p>Your Journey to UPSC Success Begins Here</p>
+            </div>
+            <div class="image">
+                <img src="pictures/rocket-bulb.png" alt="Banner">
+            </div>
+        </div>
+        <div class="mock-section">
+            <h1>Mock Papers</h1>
+            <button class="generate-btn">Generate Mock Paper</button>
+        </div>
+    </div>
+    <script>
+        document.getElementById("generate-btn").addEventListener("click", function() {
+    window.location.href = "/generate_paper";  // Triggers the download
+        });
+    </script>
+</body>
+</html>
+
